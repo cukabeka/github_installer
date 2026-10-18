@@ -127,11 +127,13 @@ github_installer_cache_no_cache = No cache files found
 # Settings
 github_installer_settings_title = Settings
 github_installer_github_token = GitHub Personal Access Token
-github_installer_github_token_help = Required for higher rate limits and private repositories. <strong>Required permissions:</strong> Repository permissions: "Contents" (Read-only for installing, Read and write for upload). All other permissions are <strong>not</strong> required.
+github_installer_github_token_help = Required for higher rate limits and private repositories. <strong>Required permissions:</strong> Repository permissions: "Contents" (Read-only for installing, Read and write for upload). All other permissions are <strong>not</strong> required. Note: Bulk upload uses the GitHub Git Data API (blobs/trees/commits) - this also falls under the same "Contents" permission, no additional token scope is needed.
 github_installer_github_token_placeholder = Enter your GitHub token (optional)
 github_installer_github_token_set_placeholder = •••••••••••••••• (set - enter a new token to change it)
 github_installer_github_token_clear = Remove token
 github_installer_github_token_create_info = Create token: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token
+github_installer_upload_history_title = Last upload
+github_installer_upload_history_info = {0} from {1} (REDAXO {2}) — source: config.yml in target repository (x-github-installer.last_upload)
 github_installer_class_settings_header = Class Installation
 github_installer_class_install_addon = Target Addon for Classes
 github_installer_class_install_addon_help = Classes are installed under lib/gitClasses/ inside this addon. Must be an installed and activated addon (default: "project").
@@ -148,6 +150,25 @@ github_installer_upload_class = Upload class
 github_installer_upload_success = "{0}" was successfully uploaded to "{1}"
 github_installer_upload_placeholder_key_hint = This item had no key set yet. "{0}" is therefore only an auto-generated placeholder based on this instance's internal ID, not a real REDAXO key. Set a proper key on the source module/template and upload again so the placeholder gets replaced by a stable key.
 github_installer_placeholder_key_badge = Placeholder
+
+# Bulk-Upload
+github_installer_bulk_upload = Bulk Upload
+github_installer_bulk_select_all = Select all
+github_installer_bulk_selected_count = {0} selected
+github_installer_bulk_execute = Upload selected
+github_installer_bulk_rows_per_page = Rows per page
+github_installer_bulk_results_title = Bulk upload result
+github_installer_bulk_success_item = "{0}" uploaded successfully
+github_installer_bulk_error_item = "{0}" failed: {1}
+github_installer_bulk_no_items_selected = No items selected
+github_installer_bulk_commit_prefix = Commit message prefix
+github_installer_bulk_warning_commits = Note: Each file creates its own GitHub commit (module = 3–4 commits). Uploading many items may take several minutes.
+github_installer_bulk_description = Description (applies to all selected)
+github_installer_bulk_version = Version (applies to all selected)
+github_installer_bulk_upload_all = Upload all
+github_installer_bulk_upload_all_confirm = Really upload ALL items of this type? This may take several minutes depending on the number and creates many GitHub commits.
+github_installer_bulk_selected_all = All selected
+github_installer_bulk_select_all_pages = Select all (all pages)
 github_installer_placeholder_key_hint = No key set on the source item - this is an auto-generated placeholder based on the internal ID, not a real key. It will not match across instances, since IDs differ per installation.
 github_installer_upload_error = Upload error
 github_installer_upload_missing_data = Please fill all required fields

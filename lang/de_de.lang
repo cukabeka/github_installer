@@ -127,11 +127,13 @@ github_installer_cache_no_cache = Keine Cache-Dateien gefunden
 # Settings
 github_installer_settings_title = Einstellungen
 github_installer_github_token = GitHub Personal Access Token
-github_installer_github_token_help = Erforderlich für höhere Rate-Limits und private Repositories. <strong>Erforderliche Berechtigungen:</strong> Repository permissions: "Contents" (Read-only für Installieren, Read and write für Upload). Alle anderen Berechtigungen sind <strong>nicht</strong> erforderlich.
+github_installer_github_token_help = Erforderlich für höhere Rate-Limits und private Repositories. <strong>Erforderliche Berechtigungen:</strong> Repository permissions: "Contents" (Read-only für Installieren, Read and write für Upload). Alle anderen Berechtigungen sind <strong>nicht</strong> erforderlich. Hinweis: Der Bulk-Upload nutzt die GitHub Git Data API (Blobs/Trees/Commits) - auch diese fällt unter dieselbe "Contents"-Permission, es ist kein zusätzlicher Token-Bedarf nötig.
 github_installer_github_token_placeholder = GitHub Token eingeben (optional)
 github_installer_github_token_set_placeholder = •••••••••••••••• (gesetzt - zum Ändern neuen Token eingeben)
 github_installer_github_token_clear = Token entfernen
 github_installer_github_token_create_info = Token erstellen: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token
+github_installer_upload_history_title = Letzter Upload
+github_installer_upload_history_info = {0} von {1} (REDAXO {2}) — Quelle: config.yml im Ziel-Repository (x-github-installer.last_upload)
 github_installer_class_settings_header = Klassen-Installation
 github_installer_class_install_addon = Ziel-Addon für Klassen
 github_installer_class_install_addon_help = Klassen werden unter lib/gitClasses/ in diesem Addon installiert. Muss ein installiertes und aktiviertes Addon sein (Standard: "project").
@@ -148,6 +150,25 @@ github_installer_upload_class = Klasse hochladen
 github_installer_upload_success = "{0}" wurde erfolgreich zu "{1}" hochgeladen
 github_installer_upload_placeholder_key_hint = Für dieses Element war noch kein Key gesetzt. "{0}" ist daher nur ein automatisch erzeugter Platzhalter aus der internen ID dieser Instanz, kein echter REDAXO-Key. Setze im Quell-Modul/-Template einen sprechenden Key und lade erneut hoch, damit der Platzhalter durch einen stabilen Key ersetzt wird.
 github_installer_placeholder_key_badge = Platzhalter
+
+# Bulk-Upload
+github_installer_bulk_upload = Bulk-Upload
+github_installer_bulk_select_all = Alle auswählen
+github_installer_bulk_selected_count = {0} ausgewählt
+github_installer_bulk_execute = Ausgewählte hochladen
+github_installer_bulk_rows_per_page = Zeilen pro Seite
+github_installer_bulk_results_title = Bulk-Upload Ergebnis
+github_installer_bulk_success_item = "{0}" erfolgreich hochgeladen
+github_installer_bulk_error_item = "{0}" fehlgeschlagen: {1}
+github_installer_bulk_no_items_selected = Keine Elemente ausgewählt
+github_installer_bulk_commit_prefix = Commit-Message Präfix
+github_installer_bulk_warning_commits = Hinweis: Pro Datei wird ein eigener GitHub-Commit erzeugt (Modul = 3–4 Commits). Bei vielen Elementen kann der Vorgang mehrere Minuten dauern.
+github_installer_bulk_description = Beschreibung (für alle ausgewählten)
+github_installer_bulk_version = Version (für alle ausgewählten)
+github_installer_bulk_upload_all = Alle hochladen
+github_installer_bulk_upload_all_confirm = Wirklich ALLE Elemente dieses Typs hochladen? Das kann je nach Anzahl mehrere Minuten dauern und erzeugt viele GitHub-Commits.
+github_installer_bulk_selected_all = Alle ausgewählt
+github_installer_bulk_select_all_pages = Alle auswählen (alle Seiten)
 github_installer_placeholder_key_hint = Kein Key im Quell-Element gesetzt – dies ist ein automatisch erzeugter Platzhalter aus der internen ID, kein echter Key. Er funktioniert nicht instanzübergreifend, da IDs je nach Installation unterschiedlich sind.
 github_installer_upload_error = Fehler beim Hochladen
 github_installer_upload_missing_data = Bitte alle Pflichtfelder ausfüllen

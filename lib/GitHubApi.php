@@ -58,8 +58,10 @@ class GitHubApi
             ],
         ];
         
-        // POST/PUT Daten hinzufügen
-        if ($data && in_array($method, ['POST', 'PUT'])) {
+        // POST/PUT/PATCH Daten hinzufügen. WICHTIG: PATCH nicht vergessen - das
+        // Ref-Update in createOrUpdateFiles() nutzt PATCH; ohne Body fehlt der
+        // 'sha' und GitHub antwortet mit HTTP 422, der Commit bleibt verwaist.
+        if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
             $contextOptions['http']['header'] .= "\r\nContent-Type: application/json";
             $contextOptions['http']['content'] = json_encode($data);
         }
@@ -79,8 +81,11 @@ class GitHubApi
             throw new \Exception('Invalid JSON response from GitHub API');
         }
         
-        // API-Fehler prüfen
-        if (isset($result['message'])) {
+        // API-Fehler prüfen. WICHTIG: Nicht bloß auf 'message' testen - erfolgreiche
+        // Responses der Git Data API (z.B. POST /git/commits) enthalten ebenfalls ein
+        // top-level 'message'-Feld (die Commit-Message). Echte GitHub-Fehlerresponses
+        // haben immer zusätzlich ein 'documentation_url'-Feld, Erfolgsresponses nie.
+        if (isset($result['message']) && isset($result['documentation_url'])) {
             throw new \Exception('GitHub API Error: ' . $result['message']);
         }
         
@@ -137,6 +142,9 @@ class GitHubApi
         }
         if (404 === $statusCode) {
             return "Resource not found (404): {$url}";
+        }
+        if (422 === $statusCode) {
+            return "GitHub API request failed (HTTP 422, Validation fehlgeschlagen): {$url} - haeufig Ursache: Branch hat sich waehrend des Uploads geaendert (z.B. paralleler Upload), bitte erneut versuchen.";
         }
         if (null !== $statusCode) {
             return "GitHub API request failed (HTTP {$statusCode}): {$url}";
@@ -304,36 +312,109 @@ class GitHubApi
     {
         return $this->createOrUpdateFile($owner, $repo, $path, $content, $message, $branch);
     }
-    
+
     /**
-     * Letztes Commit-Datum für eine Datei/Ordner abrufen
-     * 
-     * @param string $owner Repository Owner
-     * @param string $repo Repository Name
-     * @param string $path Pfad zur Datei/Ordner
-     * @param string $branch Branch Name
-     * @return string|null Datum im Format 'Y-m-d H:i:s' oder null bei Fehler
+     * Mehrere Dateien in EINEM Commit erstellen/aktualisieren (Git Data API).
+     *
+     * Die Contents-API (createOrUpdateFile) kann nur eine Datei pro Request und
+     * erzeugt damit pro Datei einen eigenen Commit. Für Bulk-Uploads ist das
+     * unpraktisch (Commit-Spam im Repo, langsam, Rate-Limit). Diese Methode nutzt
+     * stattdessen Blobs -> Tree -> Commit -> Ref-Update, sodass beliebig viele
+     * Dateien in einem einzigen Commit landen.
+     *
+     * Permissions: Die Git-Data-Endpunkte fallen bei Fine-grained Tokens unter
+     * dieselbe Repository-Permission "Contents" (Read and write) wie die
+     * Contents-API - es ist kein zusätzlicher Scope/Permission erforderlich.
+     *
+     * @param array<string, array{content: string}> $files Map Pfad => ['content' => ...]
+     * @return array Commit-Info (sha, html_url) des erzeugten Commits
      */
-    public function getLastCommitDate(string $owner, string $repo, string $path, string $branch = 'main'): ?string
+    public function createOrUpdateFiles(string $owner, string $repo, array $files, string $message = '', string $branch = 'main'): array
     {
-        try {
-            $endpoint = "repos/{$owner}/{$repo}/commits";
-            $endpoint .= "?path=" . urlencode($path);
-            $endpoint .= "&sha=" . urlencode($branch);
-            $endpoint .= "&per_page=1";
-            
-            $commits = $this->makeRequest($endpoint);
-            
-            if (!empty($commits) && isset($commits[0]['commit']['committer']['date'])) {
-                $githubDate = $commits[0]['commit']['committer']['date'];
-                // GitHub gibt ISO 8601 zurück: 2024-11-16T10:30:00Z
-                $timestamp = strtotime($githubDate);
-                return date('Y-m-d H:i:s', $timestamp);
-            }
-        } catch (\Exception $e) {
-            // Bei Fehler null zurückgeben
+        if (empty($files)) {
+            throw new \Exception('createOrUpdateFiles: keine Dateien übergeben');
         }
-        
-        return null;
+
+        // Retry-Loop: Wenn sich der Branch zwischen Basis-Commit-Auslesen und Ref-Update
+        // aendert (z.B. paralleler Upload durch Doppelklick oder zwei Backend-Tabs),
+        // antwortet das Ref-Update mit HTTP 422 "Update is not a fast forward". In dem
+        // Fall den Basis-Commit neu holen und den Commit erneut erstellen (max. 3 Versuche).
+        $lastException = null;
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                return $this->createCommitOnBranch($owner, $repo, $files, $message, $branch);
+            } catch (\Exception $e) {
+                $lastException = $e;
+                // Nur bei 422 (Fast-Forward-Konflikt) wiederholen, andere Fehler sofort werfen
+                if (false === strpos($e->getMessage(), 'HTTP 422')) {
+                    throw $e;
+                }
+            }
+        }
+        throw $lastException;
+    }
+
+    /**
+     * Einmaliger Commit-Versuch: Blobs -> Tree -> Commit -> Ref-Update.
+     * (Von createOrUpdateFiles() aus aufgerufen, inkl. Retry bei 422.)
+     *
+     * @param array<string, array{content: string}> $files Map Pfad => ['content' => ...]
+     * @return array Commit-Info (sha, html_url) des erzeugten Commits
+     */
+    private function createCommitOnBranch(string $owner, string $repo, array $files, string $message, string $branch): array
+    {
+        // 1. Basis-Commit des Branches ermitteln
+        $ref = $this->makeRequest("repos/{$owner}/{$repo}/git/ref/heads/{$branch}", 'GET', null, false);
+        $baseCommitSha = $ref['object']['sha'] ?? null;
+        if (!$baseCommitSha) {
+            throw new \Exception("Branch {$branch} nicht gefunden in {$owner}/{$repo}");
+        }
+
+        $baseCommit = $this->makeRequest("repos/{$owner}/{$repo}/git/commits/{$baseCommitSha}", 'GET', null, false);
+        $baseTreeSha = $baseCommit['tree']['sha'] ?? null;
+        if (!$baseTreeSha) {
+            throw new \Exception('Basis-Tree konnte nicht ermittelt werden');
+        }
+
+        // 2. Blobs für alle Dateien anlegen
+        $treeItems = [];
+        foreach ($files as $path => $fileData) {
+            $blob = $this->makeRequest("repos/{$owner}/{$repo}/git/blobs", 'POST', [
+                'content' => base64_encode($fileData['content']),
+                'encoding' => 'base64',
+            ], false);
+
+            $treeItems[] = [
+                'path' => $path,
+                'mode' => '100644',
+                'type' => 'blob',
+                'sha' => $blob['sha'],
+            ];
+        }
+
+        // 3. Neuen Tree erstellen (Basis-Tree als Ausgangspunkt, nur geänderte Pfade ersetzt)
+        $tree = $this->makeRequest("repos/{$owner}/{$repo}/git/trees", 'POST', [
+            'base_tree' => $baseTreeSha,
+            'tree' => $treeItems,
+        ], false);
+
+        // 4. Commit erstellen
+        $commit = $this->makeRequest("repos/{$owner}/{$repo}/git/commits", 'POST', [
+            'message' => $message ?: 'Update ' . count($treeItems) . ' file(s)',
+            'tree' => $tree['sha'],
+            'parents' => [$baseCommitSha],
+        ], false);
+
+        // 5. Branch-Ref auf neuen Commit setzen (Fast-Forward)
+        $this->makeRequest("repos/{$owner}/{$repo}/git/refs/heads/{$branch}", 'PATCH', [
+            'sha' => $commit['sha'],
+            'force' => false,
+        ], false);
+
+        return [
+            'sha' => $commit['sha'],
+            'html_url' => $commit['html_url'] ?? null,
+            'file_count' => count($treeItems),
+        ];
     }
 }
