@@ -81,9 +81,12 @@ function uploadTemplate($templateId, $github, $owner, $repo, $branch, $author, $
  * darf den Upload nicht blockieren.
  */
 function readExistingConfig($github, $owner, $repo, $path, $branch) {
+    if (!$github || !$owner || !$repo) {
+        return null;
+    }
     try {
         return $github->getFileContent($owner, $repo, $path, $branch);
-    } catch (Exception $e) {
+    } catch (\Throwable $e) {
         return null;
     }
 }
@@ -553,7 +556,15 @@ if ($func === 'upload' && !rex_post('upload', 'bool') && !$bulkWasPerformed) {
         // Upload-Historie aus der im Repo liegenden config.yml anzeigen
         // (Quelle der Wahrheit ist das Repo, nicht eine lokale DB)
         $itemKeyForHistory = $itemKey ?: ($type === 'module' ? 'module_' . $itemId : 'template_' . $itemId);
-        $historyConfig = readExistingConfig($github ?? null, $defaultRepoOwner, $defaultRepoRepo, ($type === 'module' ? 'modules/' : 'templates/') . $itemKeyForHistory . '/config.yml', $defaultRepoBranch);
+        $githubForHistory = null;
+        if ($defaultRepoOwner && $defaultRepoRepo) {
+            try {
+                $githubForHistory = new GitHubApi();
+            } catch (\Throwable $e) {
+                $githubForHistory = null;
+            }
+        }
+        $historyConfig = readExistingConfig($githubForHistory, $defaultRepoOwner, $defaultRepoRepo, ($type === 'module' ? 'modules/' : 'templates/') . $itemKeyForHistory . '/config.yml', $defaultRepoBranch);
         $lastUpload = parseLastUpload($historyConfig);
         if ($lastUpload) {
             $historyDate = $lastUpload['date'];
@@ -604,8 +615,8 @@ if ($func === 'upload' && !rex_post('upload', 'bool') && !$bulkWasPerformed) {
     
     $formElements = [];
     $n = [];
-    $n['field'] = '<button class="btn btn-primary" type="submit" name="upload" value="1">' . $this->i18n('github_installer_upload') . '</button>';
-    $n['field'] .= ' <a class="btn btn-secondary" href="' . rex_url::currentBackendPage(['type' => $type]) . '">' . $this->i18n('github_installer_cancel') . '</a>';
+    $n['field'] = '<button class="btn btn-primary" type="submit" name="upload" value="1">' . $addon->i18n('github_installer_upload') . '</button>';
+    $n['field'] .= ' <a class="btn btn-secondary" href="' . rex_url::currentBackendPage(['type' => $type]) . '">' . $addon->i18n('github_installer_cancel') . '</a>';
     $formElements[] = $n;
     
     $fragment = new rex_fragment();
@@ -629,9 +640,9 @@ if ($func === 'upload' && !rex_post('upload', 'bool') && !$bulkWasPerformed) {
 
 // Tab-Navigation
 $tabs = [
-    'module' => $this->i18n('github_installer_modules'),
-    'template' => $this->i18n('github_installer_templates'),
-    'class' => $this->i18n('github_installer_classes_title')
+    'module' => $addon->i18n('github_installer_modules'),
+    'template' => $addon->i18n('github_installer_templates'),
+    'class' => $addon->i18n('github_installer_classes_title')
 ];
 
 $tabContent = '';
